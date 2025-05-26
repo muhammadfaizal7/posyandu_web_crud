@@ -10,267 +10,211 @@ class FormulirAsiPage extends StatefulWidget {
 }
 
 class _FormulirAsiPageState extends State<FormulirAsiPage> {
-  final CollectionReference _collection =
+  final CollectionReference _formulirAsi =
       FirebaseFirestore.instance.collection("formulir_asi");
+  final CollectionReference _dataBalita =
+      FirebaseFirestore.instance.collection("balita");
 
   int _selectedMonth = DateTime.now().month;
   int _selectedYear = DateTime.now().year;
   final List<int> _tahunList = [2023, 2024, 2025, 2026];
 
   Future<void> _showFilterDialog() async {
-    showDialog(
+    int tempMonth = _selectedMonth;
+    int tempYear = _selectedYear;
+    await showDialog(
       context: context,
-      builder: (context) {
-        int tempMonth = _selectedMonth;
-        int tempYear = _selectedYear;
-        return AlertDialog(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Text("Filter Bulan & Tahun"),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              DropdownButtonFormField<int>(
-                value: tempMonth,
-                decoration: const InputDecoration(
-                  labelText: "Bulan",
-                  border: OutlineInputBorder(),
-                ),
-                items: List.generate(12, (index) {
-                  return DropdownMenuItem(
-                    value: index + 1,
-                    child: Text("Bulan ${index + 1}"),
-                  );
-                }),
-                onChanged: (value) => tempMonth = value!,
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<int>(
-                value: tempYear,
-                decoration: const InputDecoration(
-                  labelText: "Tahun",
-                  border: OutlineInputBorder(),
-                ),
-                items: _tahunList.map((year) {
-                  return DropdownMenuItem(value: year, child: Text("$year"));
-                }).toList(),
-                onChanged: (value) => tempYear = value!,
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text("Batal"),
+      builder: (_) => AlertDialog(
+        title: const Text("Filter Bulan & Tahun"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            DropdownButtonFormField<int>(
+              value: tempMonth,
+              decoration: const InputDecoration(labelText: "Bulan"),
+              items: List.generate(12, (index) {
+                return DropdownMenuItem(
+                  value: index + 1,
+                  child: Text("Bulan ${index + 1}"),
+                );
+              }),
+              onChanged: (value) => tempMonth = value!,
             ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.pinkAccent,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              onPressed: () {
-                setState(() {
-                  _selectedMonth = tempMonth;
-                  _selectedYear = tempYear;
-                });
-                Navigator.pop(context);
-              },
-              child: const Text("Terapkan"),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<int>(
+              value: tempYear,
+              decoration: const InputDecoration(labelText: "Tahun"),
+              items: _tahunList
+                  .map((year) =>
+                      DropdownMenuItem(value: year, child: Text("$year")))
+                  .toList(),
+              onChanged: (value) => tempYear = value!,
             ),
           ],
-        );
-      },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Batal"),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              setState(() {
+                _selectedMonth = tempMonth;
+                _selectedYear = tempYear;
+              });
+              Navigator.pop(context);
+            },
+            child: const Text("Terapkan"),
+          ),
+        ],
+      ),
     );
   }
 
   Future<void> _hapusData(String docId) async {
-    bool? confirm = await showDialog(
+    final confirm = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text("Hapus Data"),
         content: const Text("Yakin ingin menghapus data ini?"),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text("Batal"),
-          ),
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text("Batal")),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () => Navigator.pop(context, true),
             child: const Text("Hapus"),
           ),
         ],
       ),
     );
-
     if (confirm == true) {
-      await _collection.doc(docId).delete();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Data berhasil dihapus.")),
-      );
+      await _formulirAsi.doc(docId).delete();
     }
   }
 
   void _tambahAtauEditData({
     String? docId,
-    String? provinsi,
-    String? kabupaten,
-    String? puskesmas,
-    String? desa,
-    String? posyandu,
-    int? bulan,
-    int? tahun,
     String? namaAnak,
     String? tanggalLahir,
-    int? umurBayi,
+    List<bool>? asiBulan,
   }) {
-    final TextEditingController provinsiController =
-        TextEditingController(text: provinsi);
-    final TextEditingController kabupatenController =
-        TextEditingController(text: kabupaten);
-    final TextEditingController puskesmasController =
-        TextEditingController(text: puskesmas);
-    final TextEditingController desaController =
-        TextEditingController(text: desa);
-    final TextEditingController posyanduController =
-        TextEditingController(text: posyandu);
-    final TextEditingController namaAnakController =
-        TextEditingController(text: namaAnak);
-    final TextEditingController tanggalLahirController =
-        TextEditingController(text: tanggalLahir);
-    final TextEditingController umurBayiController = TextEditingController(
-        text: umurBayi != null ? umurBayi.toString() : "");
-    int selectedBulan = bulan ?? _selectedMonth;
-    int selectedTahun = tahun ?? _selectedYear;
+    final List<bool> asiStatus = List.generate(7, (i) => asiBulan?[i] ?? false);
+    String? selectedNama = namaAnak;
+    String selectedTanggal = tanggalLahir ?? "";
 
     showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setStateDialog) => AlertDialog(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Text(docId == null ? "Tambah Data ASI" : "Edit Data ASI"),
-          content: SingleChildScrollView(
-            child: Column(
-              children: [
-                _buildInputField(provinsiController, "Provinsi"),
-                _buildInputField(kabupatenController, "Kabupaten"),
-                _buildInputField(puskesmasController, "Puskesmas"),
-                _buildInputField(desaController, "Desa/Kelurahan"),
-                _buildInputField(posyanduController, "Nama Posyandu"),
-                DropdownButtonFormField<int>(
-                  value: selectedBulan,
-                  decoration: const InputDecoration(
-                    labelText: "Bulan",
-                    border: OutlineInputBorder(),
+      builder: (_) => StatefulBuilder(
+        builder: (context, setStateDialog) {
+          return AlertDialog(
+            title: Text(docId == null ? "Tambah Data ASI" : "Edit Data ASI"),
+            content: SingleChildScrollView(
+              child: Column(
+                children: [
+                  StreamBuilder<QuerySnapshot>(
+                    stream: _dataBalita.orderBy('nama').snapshots(),
+                    builder: (context, snapshot) {
+                      if (!snapshot.hasData)
+                        return const CircularProgressIndicator();
+                      final docs = snapshot.data!.docs;
+                      return DropdownButtonFormField<String>(
+                        value: selectedNama,
+                        decoration: const InputDecoration(
+                          labelText: "Nama Anak",
+                          border: OutlineInputBorder(),
+                        ),
+                        items: docs.map<DropdownMenuItem<String>>((doc) {
+                          final data = doc.data() as Map<String, dynamic>;
+                          final nama = data['nama'] as String? ?? "-";
+                          final timestamp = data['tanggal_lahir'];
+                          return DropdownMenuItem<String>(
+                            value: nama,
+                            child: Text(nama),
+                            onTap: () {
+                              if (timestamp is Timestamp) {
+                                final formattedDate = DateFormat('dd-MM-yyyy')
+                                    .format(timestamp.toDate());
+                                setStateDialog(
+                                    () => selectedTanggal = formattedDate);
+                              } else {
+                                setStateDialog(() => selectedTanggal = "");
+                              }
+                            },
+                          );
+                        }).toList(),
+                        onChanged: (val) =>
+                            setStateDialog(() => selectedNama = val),
+                      );
+                    },
                   ),
-                  items: List.generate(12, (index) {
-                    return DropdownMenuItem(
-                      value: index + 1,
-                      child: Text("Bulan ${index + 1}"),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      const Text("Tanggal Lahir: "),
+                      Text(selectedTanggal),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  const Text("Status ASI per Bulan (0–6)"),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children: List.generate(7, (i) {
+                      return Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text("$i"),
+                          Checkbox(
+                            value: asiStatus[i],
+                            onChanged: (val) {
+                              setStateDialog(() => asiStatus[i] = val ?? false);
+                            },
+                          ),
+                        ],
+                      );
+                    }),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text("Batal")),
+              ElevatedButton(
+                onPressed: () async {
+                  if (selectedNama == null || selectedTanggal.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                          content:
+                              Text("Nama anak dan tanggal lahir wajib diisi")),
                     );
-                  }),
-                  onChanged: (val) =>
-                      setStateDialog(() => selectedBulan = val!),
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<int>(
-                  value: selectedTahun,
-                  decoration: const InputDecoration(
-                    labelText: "Tahun",
-                    border: OutlineInputBorder(),
-                  ),
-                  items: _tahunList.map((year) {
-                    return DropdownMenuItem(value: year, child: Text("$year"));
-                  }).toList(),
-                  onChanged: (val) =>
-                      setStateDialog(() => selectedTahun = val!),
-                ),
-                _buildInputField(namaAnakController, "Nama Anak"),
-                TextField(
-                  controller: tanggalLahirController,
-                  readOnly: true,
-                  decoration: InputDecoration(
-                    labelText: "Tanggal Lahir",
-                    border: OutlineInputBorder(),
-                    suffixIcon: const Icon(Icons.calendar_today),
-                  ),
-                  onTap: () async {
-                    DateTime? pickedDate = await showDatePicker(
-                      context: context,
-                      initialDate: tanggalLahir != null
-                          ? DateFormat('dd-MM-yyyy').parse(tanggalLahir)
-                          : DateTime.now(),
-                      firstDate: DateTime(2000),
-                      lastDate: DateTime.now(),
-                    );
-                    if (pickedDate != null) {
-                      tanggalLahirController.text =
-                          DateFormat('dd-MM-yyyy').format(pickedDate);
-                    }
-                  },
-                ),
-                const SizedBox(height: 12),
-                _buildInputField(
-                  umurBayiController,
-                  "Umur Bayi (bulan)",
-                  keyboardType: TextInputType.number,
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text("Batal"),
-            ),
-            ElevatedButton(
-              style:
-                  ElevatedButton.styleFrom(backgroundColor: Colors.pinkAccent),
-              onPressed: () async {
-                final data = {
-                  "provinsi": provinsiController.text,
-                  "kabupaten": kabupatenController.text,
-                  "puskesmas": puskesmasController.text,
-                  "desa": desaController.text,
-                  "posyandu": posyanduController.text,
-                  "bulan": selectedBulan,
-                  "tahun": selectedTahun,
-                  "namaAnak": namaAnakController.text,
-                  "tanggalLahir": tanggalLahirController.text,
-                  "umurBayi": int.tryParse(umurBayiController.text) ?? 0,
-                };
+                    return;
+                  }
 
-                if (docId == null) {
-                  await _collection.add(data);
-                } else {
-                  await _collection.doc(docId).update(data);
-                }
-                Navigator.pop(context);
-              },
-              child: const Text("Simpan"),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+                  final data = {
+                    "namaAnak": selectedNama,
+                    "tanggalLahir": selectedTanggal,
+                    "bulan": _selectedMonth,
+                    "tahun": _selectedYear,
+                    "asiStatus": asiStatus,
+                  };
 
-  Widget _buildInputField(TextEditingController controller, String label,
-      {TextInputType keyboardType = TextInputType.text}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: TextField(
-        controller: controller,
-        keyboardType: keyboardType,
-        decoration: InputDecoration(
-          labelText: label,
-          border: OutlineInputBorder(),
-        ),
+                  if (docId == null) {
+                    await _formulirAsi.add(data);
+                  } else {
+                    await _formulirAsi.doc(docId).update(data);
+                  }
+                  Navigator.pop(context);
+                },
+                child: const Text("Simpan"),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -278,17 +222,13 @@ class _FormulirAsiPageState extends State<FormulirAsiPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
       appBar: AppBar(
         title: const Text("Formulir ASI"),
         centerTitle: true,
-        elevation: 0,
         backgroundColor: Colors.pinkAccent,
         actions: [
           IconButton(
-            onPressed: _showFilterDialog,
-            icon: const Icon(Icons.filter_alt_outlined),
-          ),
+              onPressed: _showFilterDialog, icon: const Icon(Icons.filter_alt)),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
@@ -298,79 +238,61 @@ class _FormulirAsiPageState extends State<FormulirAsiPage> {
         backgroundColor: Colors.pinkAccent,
       ),
       body: StreamBuilder<QuerySnapshot>(
-        stream: _collection
+        stream: _formulirAsi
             .where("bulan", isEqualTo: _selectedMonth)
             .where("tahun", isEqualTo: _selectedYear)
             .snapshots(),
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
+          if (!snapshot.hasData)
             return const Center(child: CircularProgressIndicator());
-          }
-          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return const Center(child: Text("Belum ada data bulan ini 🍼"));
-          }
 
           final docs = snapshot.data!.docs;
+          if (docs.isEmpty)
+            return const Center(child: Text("Belum ada data bulan ini"));
 
           return ListView.builder(
             padding: const EdgeInsets.all(12),
             itemCount: docs.length,
             itemBuilder: (context, index) {
               final data = docs[index].data() as Map<String, dynamic>;
+              final asiStatus = List<bool>.from(data['asiStatus'] ?? []);
               return Card(
-                elevation: 3,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                margin: const EdgeInsets.symmetric(vertical: 8),
+                    borderRadius: BorderRadius.circular(12)),
+                margin: const EdgeInsets.symmetric(vertical: 6),
                 child: ListTile(
-                  contentPadding: const EdgeInsets.all(16),
-                  leading: CircleAvatar(
-                    backgroundColor: Colors.pinkAccent,
-                    child: Text(
-                      data['namaAnak']?.substring(0, 1).toUpperCase() ?? "-",
-                      style: const TextStyle(color: Colors.white),
-                    ),
-                  ),
-                  title: Text(
-                    data['namaAnak'] ?? "-",
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  subtitle: Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                            "${data['desa'] ?? '-'}, ${data['posyandu'] ?? '-'}"),
-                        const SizedBox(height: 4),
-                        Text("Umur Bayi: ${data['umurBayi'] ?? '-'} bulan"),
-                      ],
-                    ),
+                  contentPadding: const EdgeInsets.all(12),
+                  title: Text(data['namaAnak'] ?? "-"),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text("Tanggal Lahir: ${data['tanggalLahir'] ?? '-'}"),
+                      const SizedBox(height: 4),
+                      Wrap(
+                        spacing: 8,
+                        children: List.generate(asiStatus.length, (i) {
+                          final symbol = asiStatus[i] ? '✓' : 'X';
+                          return Chip(label: Text("Bulan $i: $symbol"));
+                        }),
+                      ),
+                    ],
                   ),
                   trailing: PopupMenuButton<String>(
                     onSelected: (value) {
                       if (value == 'edit') {
                         _tambahAtauEditData(
                           docId: docs[index].id,
-                          provinsi: data['provinsi'],
-                          kabupaten: data['kabupaten'],
-                          puskesmas: data['puskesmas'],
-                          desa: data['desa'],
-                          posyandu: data['posyandu'],
-                          bulan: data['bulan'],
-                          tahun: data['tahun'],
                           namaAnak: data['namaAnak'],
                           tanggalLahir: data['tanggalLahir'],
-                          umurBayi: data['umurBayi'],
+                          asiBulan: List<bool>.from(data['asiStatus'] ?? []),
                         );
                       } else if (value == 'hapus') {
                         _hapusData(docs[index].id);
                       }
                     },
-                    itemBuilder: (context) => [
-                      const PopupMenuItem(value: 'edit', child: Text('Edit')),
-                      const PopupMenuItem(value: 'hapus', child: Text('Hapus')),
+                    itemBuilder: (_) => [
+                      const PopupMenuItem(value: 'edit', child: Text("Edit")),
+                      const PopupMenuItem(value: 'hapus', child: Text("Hapus")),
                     ],
                   ),
                 ),

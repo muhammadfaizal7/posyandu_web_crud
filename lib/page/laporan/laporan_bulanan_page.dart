@@ -1,11 +1,9 @@
-import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:pdf/pdf.dart';
-import 'package:pdf/widgets.dart' as pw;
-import 'package:printing/printing.dart';
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 class LaporanBulananPage extends StatefulWidget {
-  const LaporanBulananPage({Key? key}) : super(key: key);
+  const LaporanBulananPage({super.key});
 
   @override
   State<LaporanBulananPage> createState() => _LaporanBulananPageState();
@@ -14,52 +12,55 @@ class LaporanBulananPage extends StatefulWidget {
 class _LaporanBulananPageState extends State<LaporanBulananPage> {
   final _formKey = GlobalKey<FormState>();
 
-  // UMUM
-  final _namaKelompokController = TextEditingController();
-  final _desaController = TextEditingController();
-  final _petugasController = TextEditingController();
-  final _jumlahPendudukController = TextEditingController();
-  final _kaderAktifController = TextEditingController();
-  final _keteranganController = TextEditingController();
-
-  // BULAN / TAHUN
   int _selectedMonth = DateTime.now().month;
   int _selectedYear = DateTime.now().year;
   final _tahunList = [2023, 2024, 2025, 2026];
 
-  // II. KEGIATAN PENIMBANGAN (13 Baris x 6 Kolom: Bayi, Baduta, Balita [L/P])
-  final List<String> kegiatanLabels = [
-    '1. Jumlah semua balita ... (S)',
-    '2. Balita terdaftar & punya KMS',
-    '3. Balita naik BB bulan ini (N)',
-    '4. Balita tidak naik BB bulan ini',
-    '5. Ditimbang tapi bukan di pos ini',
-    '6. Ditimbang pertama kali bulan ini',
-    '7. Total ditimbang bulan ini (3+4+5+6)',
-    '8. Tidak hadir bulan ini',
-    '9. BGM bulan ini',
-    '10. BB < garis merah & titik-titik',
-    '11. Dpt vit A (biru)',
-    '12. Dpt vit A 2x setahun',
-    '13. 36 bln dpt vit A + Fe (L)',
+  final _tanggalPenimbanganController = TextEditingController();
+  final _tanggalPelaporanController = TextEditingController();
+
+  final List<String> pertanyaanList = [
+    '1. Jumlah semua balita yang ada dalam kelompok penimbangan bulan ini (S)',
+    '2. Jumlah balita yang terdaftar dan mempunyai KMS bulan ini (K)',
+    '3. Jumlah balita yang naik berat badannya bulan ini (N)',
+    '4. Jumlah balita yang tidak naik berat badannya bulan ini (T)',
+    '5. Jumlah balita yang ditimbang bulan ini tapi tidak di timbang bulan lalu (O)',
+    '6. Jumlah balita yang pertama kali di timbang bulan ini (B)',
+    '7. Jumlah semua balita yang ditimbang bulan ini (3+4+5+6) (D)',
+    '8. Jumlah balita yang tidak hadir di kelompok penimbangan pada bulan ini (1-7) (-)',
+    '9. Jumlah balita yang berat badannya berada di bawah garis merah bulan ini (BGM)',
+    '10. Jumlah balita yang berat badannya berada di bawah garis titik-titik dan di atas garis merah bulan ini (R)',
+    '11. Jumlah balita yang 2 kali tidak naik berat badannya bulan ini (2T)',
+    '12. Jumlah balita yang mendapat vitamin A bulan ini (A)',
+    '13. Jumlah balita yang ditimbang bulan ini mencapai umur 36 bulan (S.36)',
+    '14. Jumlah balita yang mencapai umur 36 bulan pada bulan ini dengan berat badan 11,5 kg atau lebih (L)',
   ];
 
-  final List<List<TextEditingController>> kegiatanControllers = List.generate(
-      13, (_) => List.generate(6, (_) => TextEditingController()));
+  final pertanyaanControllers = List.generate(
+    14,
+    (_) => List.generate(6, (_) => TextEditingController()),
+  );
 
-  // III. PERSEDIAAN (4 baris x 5 kolom)
-  final List<List<TextEditingController>> persediaanControllers =
-      List.generate(4, (_) => List.generate(5, (_) => TextEditingController()));
+  final bahanList = ['KMS Baru', 'Oralit', 'Vitamin A', 'Tablet FE'];
+  final kategoriList = [
+    'Sisa Bulan Lalu',
+    'Diterima Bulan Ini',
+    'Diberikan Bulan Ini',
+    'Sisa Akhir Bulan Ini'
+  ];
+
+  final persediaanControllers = List.generate(
+    4,
+    (_) => List.generate(4, (_) => TextEditingController()),
+  );
+
+  String? _editingDocId;
 
   @override
   void dispose() {
-    _namaKelompokController.dispose();
-    _desaController.dispose();
-    _petugasController.dispose();
-    _jumlahPendudukController.dispose();
-    _kaderAktifController.dispose();
-    _keteranganController.dispose();
-    for (var row in kegiatanControllers) {
+    _tanggalPenimbanganController.dispose();
+    _tanggalPelaporanController.dispose();
+    for (var row in pertanyaanControllers) {
       for (var ctrl in row) {
         ctrl.dispose();
       }
@@ -72,128 +73,126 @@ class _LaporanBulananPageState extends State<LaporanBulananPage> {
     super.dispose();
   }
 
-  Future<void> _simpanData() async {
-    if (!_formKey.currentState!.validate()) return;
+  Future<void> _pickDate(TextEditingController controller) async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime(2022),
+      lastDate: DateTime(2035),
+    );
+    if (picked != null) {
+      controller.text = DateFormat('dd-MM-yyyy').format(picked);
+    }
+  }
 
-    final kegiatanData = kegiatanControllers.map((row) {
-      return row.map((ctrl) => ctrl.text).toList();
-    }).toList();
+  void _resetForm() {
+    _editingDocId = null;
+    _tanggalPelaporanController.clear();
+    _tanggalPenimbanganController.clear();
+    for (var row in pertanyaanControllers) {
+      for (var ctrl in row) {
+        ctrl.clear();
+      }
+    }
+    for (var row in persediaanControllers) {
+      for (var ctrl in row) {
+        ctrl.clear();
+      }
+    }
+  }
 
-    final persediaanData = persediaanControllers.map((row) {
-      return row.map((ctrl) => ctrl.text).toList();
-    }).toList();
-
-    final data = {
-      'namaKelompok': _namaKelompokController.text,
-      'desa': _desaController.text,
-      'petugas': _petugasController.text,
-      'jumlahPenduduk': _jumlahPendudukController.text,
-      'kaderAktif': _kaderAktifController.text,
-      'keterangan': _keteranganController.text,
-      'bulan': _selectedMonth,
-      'tahun': _selectedYear,
-      'kegiatanPenimbangan': kegiatanData,
-      'persediaanBahan': persediaanData,
-      'createdAt': FieldValue.serverTimestamp(),
-    };
-
+  void _loadDataForEdit(Map<String, dynamic> data, String docId) {
     try {
-      await FirebaseFirestore.instance.collection('laporan_bulanan').add(data);
-      final pdf = await _generatePDF(kegiatanData, persediaanData);
-      await Printing.layoutPdf(onLayout: (format) => pdf.save());
+      _editingDocId = docId;
+      _tanggalPelaporanController.text = data['tanggalPelaporan'] ?? '';
+      _tanggalPenimbanganController.text = data['tanggalPenimbangan'] ?? '';
+
+      final List kegiatanList = data['kegiatanPenimbangan'] ?? [];
+      for (int i = 0; i < kegiatanList.length; i++) {
+        final row = kegiatanList[i]['nilai'] as List<dynamic>;
+        for (int j = 0; j < row.length; j++) {
+          pertanyaanControllers[i][j].text = row[j].toString();
+        }
+      }
+
+      final List persediaanList = data['persediaanBahan'] ?? [];
+      for (int i = 0; i < persediaanList.length; i++) {
+        final row = persediaanList[i]['stok'] as List<dynamic>;
+        for (int j = 0; j < row.length; j++) {
+          persediaanControllers[i][j].text = row[j].toString();
+        }
+      }
+    } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Data berhasil disimpan")),
-      );
-    } catch (_) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Gagal menyimpan data")),
+        SnackBar(content: Text('Gagal load data: $e')),
       );
     }
   }
 
-  Future<pw.Document> _generatePDF(List<List<String>> kegiatanData,
-      List<List<String>> persediaanData) async {
-    final pdf = pw.Document();
+  Future<void> _simpanData() async {
+    if (!_formKey.currentState!.validate()) return;
 
-    pdf.addPage(
-      pw.MultiPage(
-        pageFormat: PdfPageFormat.a4,
-        build: (context) => [
-          pw.Center(
-            child: pw.Text(
-              'LAPORAN BULANAN KELOMPOK PENIMBANG',
-              style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
-            ),
-          ),
-          pw.SizedBox(height: 8),
-          pw.Text('TGL PENIMBANGAN BULAN INI: ........10..........'),
-          pw.SizedBox(height: 16),
-          pw.Text('I. UMUM',
-              style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-          pw.Bullet(text: 'a. Nama kelompok: ${_namaKelompokController.text}'),
-          pw.Bullet(text: 'b. Desa/Kelurahan: ${_desaController.text}'),
-          pw.Bullet(text: 'c. Petugas: ${_petugasController.text}'),
-          pw.Bullet(
-              text: 'd. Jumlah Penduduk: ${_jumlahPendudukController.text}'),
-          pw.Bullet(text: 'e. Kader Aktif:\n   ${_kaderAktifController.text}'),
-          pw.SizedBox(height: 16),
-          pw.Text('II. KEGIATAN PENIMBANGAN',
-              style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-          pw.Table.fromTextArray(
-            headers: [
-              'No',
-              'Bayi L',
-              'Bayi P',
-              'Baduta L',
-              'Baduta P',
-              'Balita L',
-              'Balita P'
-            ],
-            data: List.generate(kegiatanLabels.length, (i) {
-              return [kegiatanLabels[i], ...kegiatanData[i]];
-            }),
-          ),
-          pw.SizedBox(height: 16),
-          pw.Text('III. PERSEDIAAN BAHAN-BAHAN',
-              style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-          pw.Table.fromTextArray(
-            headers: [
-              'No',
-              'Bahan',
-              'Sisa Awal',
-              'Diterima',
-              'Dikeluarkan',
-              'Sisa Akhir'
-            ],
-            data: List.generate(persediaanData.length, (i) {
-              return ['${i + 1}', ...persediaanData[i]];
-            }),
-          ),
-          pw.SizedBox(height: 16),
-          pw.Text('IV. KETERANGAN YANG PERLU DILAPORKAN',
-              style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-          pw.Text(_keteranganController.text),
-          pw.SizedBox(height: 32),
-          pw.Row(
-            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-            children: [
-              pw.Column(children: [
-                pw.Text('Ketua Kelompok'),
-                pw.SizedBox(height: 40),
-                pw.Text('________________'),
-              ]),
-              pw.Column(children: [
-                pw.Text('Penimbang'),
-                pw.SizedBox(height: 40),
-                pw.Text('________________'),
-              ])
-            ],
-          )
-        ],
-      ),
-    );
+    try {
+      final kegiatan = List.generate(pertanyaanControllers.length, (i) {
+        return {
+          'pertanyaan': pertanyaanList[i],
+          'nilai': List.generate(
+              6, (j) => int.tryParse(pertanyaanControllers[i][j].text) ?? 0),
+        };
+      });
 
-    return pdf;
+      final persediaan = List.generate(persediaanControllers.length, (i) {
+        return {
+          'bahan': bahanList[i],
+          'stok': List.generate(
+              4, (j) => int.tryParse(persediaanControllers[i][j].text) ?? 0),
+        };
+      });
+
+      final data = {
+        'bulan': _selectedMonth,
+        'tahun': _selectedYear,
+        'tanggalPenimbangan': _tanggalPenimbanganController.text,
+        'tanggalPelaporan': _tanggalPelaporanController.text,
+        'kegiatanPenimbangan': kegiatan,
+        'persediaanBahan': persediaan,
+        'createdAt': FieldValue.serverTimestamp(),
+      };
+
+      final coll = FirebaseFirestore.instance.collection('laporan_bulanan');
+
+      if (_editingDocId != null) {
+        await coll.doc(_editingDocId).update(data);
+      } else {
+        await coll.add(data);
+      }
+
+      _resetForm();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Data berhasil disimpan')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal menyimpan data: $e')),
+      );
+    }
+  }
+
+  Future<void> _hapusData(String docId) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('laporan_bulanan')
+          .doc(docId)
+          .delete();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Data berhasil dihapus')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal menghapus data: $e')),
+      );
+    }
   }
 
   @override
@@ -205,15 +204,8 @@ class _LaporanBulananPageState extends State<LaporanBulananPage> {
         child: Form(
           key: _formKey,
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildTextField(_namaKelompokController, 'Nama Kelompok'),
-              _buildTextField(_desaController, 'Desa/Kelurahan'),
-              _buildTextField(_petugasController, 'Petugas Lapangan'),
-              _buildTextField(_jumlahPendudukController, 'Jumlah Penduduk',
-                  isNumber: true),
-              _buildTextField(_kaderAktifController, 'Jumlah Kader Aktif'),
-              _buildTextField(_keteranganController, 'Keterangan', maxLines: 3),
-              const SizedBox(height: 12),
               Row(
                 children: [
                   Expanded(
@@ -221,10 +213,13 @@ class _LaporanBulananPageState extends State<LaporanBulananPage> {
                       value: _selectedMonth,
                       decoration: const InputDecoration(labelText: 'Bulan'),
                       items: List.generate(
-                          12,
-                          (i) => DropdownMenuItem(
-                              value: i + 1, child: Text('${i + 1}'))),
-                      onChanged: (v) => setState(() => _selectedMonth = v!),
+                        12,
+                        (i) => DropdownMenuItem(
+                          value: i + 1,
+                          child: Text('Bulan ${i + 1}'),
+                        ),
+                      ),
+                      onChanged: (val) => setState(() => _selectedMonth = val!),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -236,76 +231,98 @@ class _LaporanBulananPageState extends State<LaporanBulananPage> {
                           .map((y) =>
                               DropdownMenuItem(value: y, child: Text('$y')))
                           .toList(),
-                      onChanged: (v) => setState(() => _selectedYear = v!),
+                      onChanged: (val) => setState(() => _selectedYear = val!),
                     ),
                   ),
                 ],
               ),
+              _buildTextField(
+                  _tanggalPenimbanganController, 'Tanggal Penimbangan',
+                  readOnly: true,
+                  onTap: () => _pickDate(_tanggalPenimbanganController)),
+              _buildTextField(_tanggalPelaporanController, 'Tanggal Pelaporan',
+                  readOnly: true,
+                  onTap: () => _pickDate(_tanggalPelaporanController)),
               const SizedBox(height: 16),
-              _buildSectionTitle('II. Kegiatan Penimbangan'),
-              ...List.generate(kegiatanLabels.length, (index) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(kegiatanLabels[index]),
-                    Row(
-                      children: List.generate(6, (col) {
-                        return Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.all(4),
-                            child: TextFormField(
-                              controller: kegiatanControllers[index][col],
-                              keyboardType: TextInputType.number,
-                              decoration: InputDecoration(
-                                labelText: [
-                                  'Bayi L',
-                                  'Bayi P',
-                                  'Baduta L',
-                                  'Baduta P',
-                                  'Balita L',
-                                  'Balita P'
-                                ][col],
-                                border: const OutlineInputBorder(),
+              const Text('II. Kegiatan Penimbangan',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              _buildPertanyaanSection(),
+              const SizedBox(height: 16),
+              const Text('III. Persediaan Bahan-Bahan',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              _buildPersediaanSection(),
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  ElevatedButton(
+                    onPressed: _simpanData,
+                    style:
+                        ElevatedButton.styleFrom(backgroundColor: Colors.pink),
+                    child: const Text('Simpan'),
+                  ),
+                  ElevatedButton(
+                    onPressed: _resetForm,
+                    child: const Text('Reset'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 32),
+              const Text('Data Tersimpan',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 12),
+              StreamBuilder<QuerySnapshot>(
+                stream: FirebaseFirestore.instance
+                    .collection('laporan_bulanan')
+                    .where('bulan', isEqualTo: _selectedMonth)
+                    .where('tahun', isEqualTo: _selectedYear)
+                    .orderBy('createdAt', descending: true)
+                    .snapshots(),
+                builder: (context, snapshot) {
+                  if (snapshot.hasError) {
+                    return Text('Error: ${snapshot.error}');
+                  }
+                  if (!snapshot.hasData) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  final docs = snapshot.data!.docs;
+                  return ListView.builder(
+                    itemCount: docs.length,
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemBuilder: (context, i) {
+                      final data = docs[i].data() as Map<String, dynamic>;
+                      return Card(
+                        child: ListTile(
+                          title: Text(
+                              "Pelaporan: ${data['tanggalPelaporan'] ?? '-'}"),
+                          subtitle: Text(
+                              "Penimbangan: ${data['tanggalPenimbangan'] ?? '-'}"),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon:
+                                    const Icon(Icons.edit, color: Colors.blue),
+                                onPressed: () {
+                                  _loadDataForEdit(data, docs[i].id);
+                                  Scrollable.ensureVisible(
+                                      _formKey.currentContext!);
+                                },
                               ),
-                            ),
-                          ),
-                        );
-                      }),
-                    )
-                  ],
-                );
-              }),
-              const SizedBox(height: 16),
-              _buildSectionTitle('III. Persediaan Bahan'),
-              ...List.generate(4, (i) {
-                return Row(
-                  children: List.generate(5, (j) {
-                    return Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.all(4),
-                        child: TextFormField(
-                          controller: persediaanControllers[i][j],
-                          decoration: InputDecoration(
-                            labelText: [
-                              'Bahan',
-                              'Sisa Awal',
-                              'Diterima',
-                              'Dikeluarkan',
-                              'Sisa Akhir'
-                            ][j],
-                            border: const OutlineInputBorder(),
+                              IconButton(
+                                icon:
+                                    const Icon(Icons.delete, color: Colors.red),
+                                onPressed: () => _hapusData(docs[i].id),
+                              ),
+                            ],
                           ),
                         ),
-                      ),
-                    );
-                  }),
-                );
-              }),
-              const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: _simpanData,
-                child: const Text('Simpan & Cetak PDF'),
-              )
+                      );
+                    },
+                  );
+                },
+              ),
             ],
           ),
         ),
@@ -314,29 +331,97 @@ class _LaporanBulananPageState extends State<LaporanBulananPage> {
   }
 
   Widget _buildTextField(TextEditingController controller, String label,
-      {bool isNumber = false, int maxLines = 1}) {
+      {bool isNumber = false, bool readOnly = false, VoidCallback? onTap}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: TextFormField(
         controller: controller,
+        readOnly: readOnly,
+        onTap: onTap,
         keyboardType: isNumber ? TextInputType.number : TextInputType.text,
-        maxLines: maxLines,
+        decoration: InputDecoration(
+          labelText: label,
+          border: const OutlineInputBorder(),
+        ),
         validator: (value) =>
             (value == null || value.isEmpty) ? 'Wajib diisi' : null,
-        decoration: InputDecoration(
-            labelText: label, border: const OutlineInputBorder()),
       ),
     );
   }
 
-  Widget _buildSectionTitle(String title) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      child: Align(
-        alignment: Alignment.centerLeft,
-        child: Text(title,
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-      ),
+  Widget _buildPertanyaanSection() {
+    final labels = [
+      'Bayi L',
+      'Bayi P',
+      'Baduta L',
+      'Baduta P',
+      'Balita L',
+      'Balita P'
+    ];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: List.generate(pertanyaanList.length, (index) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(pertanyaanList[index],
+                style: const TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Row(
+              children: List.generate(6, (col) {
+                return Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.all(4),
+                    child: TextFormField(
+                      controller: pertanyaanControllers[index][col],
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        labelText: labels[col],
+                        border: const OutlineInputBorder(),
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            ),
+            const SizedBox(height: 12),
+          ],
+        );
+      }),
+    );
+  }
+
+  Widget _buildPersediaanSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: List.generate(bahanList.length, (index) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(bahanList[index],
+                style: const TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Row(
+              children: List.generate(4, (col) {
+                return Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.all(4),
+                    child: TextFormField(
+                      controller: persediaanControllers[index][col],
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        labelText: kategoriList[col],
+                        border: const OutlineInputBorder(),
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            ),
+            const SizedBox(height: 12),
+          ],
+        );
+      }),
     );
   }
 }
