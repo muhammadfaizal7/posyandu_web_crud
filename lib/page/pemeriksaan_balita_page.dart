@@ -18,7 +18,6 @@ class _PemeriksaanBalitaPageState extends State<PemeriksaanBalitaPage> {
   int _selectedYear = DateTime.now().year;
 
   static const Color primaryColor = Color(0xFFD81B60);
-  static const Color primaryLight = Color(0xFFFF5983);
   static const Color primaryDark = Color(0xFFA00037);
   static const Color surfaceColor = Color(0xFFFFF8F9);
   static const Color cardColor = Color(0xFFFFFBFC);

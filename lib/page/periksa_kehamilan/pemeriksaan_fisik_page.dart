@@ -39,8 +39,6 @@ class _PemeriksaanFisikPageState extends State<PemeriksaanFisikPage> {
 
   // Consistent color scheme
   static const Color primaryColor = Color(0xFFD81B60);
-  static const Color primaryLight = Color(0xFFFF5983);
-  static const Color primaryDark = Color(0xFFA00037);
   static const Color backgroundColor = Color(0xFFFFF0F5);
   static const Color cardColor = Colors.white;
   static const Color textPrimary = Color(0xFF2D2D2D);
@@ -565,6 +563,7 @@ class _PemeriksaanFisikPageState extends State<PemeriksaanFisikPage> {
     );
   }
 
+  // ignore: unused_element
   Widget _buildExpandableSection({
     required String title,
     required String content,

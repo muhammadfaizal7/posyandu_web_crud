@@ -434,6 +434,7 @@ class _ImunisasiObatPageState extends State<ImunisasiObatPage> {
 
   // This function is not used in the original ImunisasiObatPage,
   // but included for consistency if expandable sections are desired later.
+  // ignore: unused_element
   Widget _buildExpandableSection({
     required String title,
     required String content,

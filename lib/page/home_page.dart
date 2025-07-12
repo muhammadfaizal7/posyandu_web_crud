@@ -52,6 +52,7 @@ class _HomePageState extends State<HomePage> {
             .get();
 
         final filteredIbu = ibuRawSnap.docs.where((doc) {
+          // ignore: unnecessary_cast
           final data = doc.data() as Map<String, dynamic>;
 
           final dynamicBulan = data['bulan'];
@@ -143,6 +144,7 @@ class _HomePageState extends State<HomePage> {
           .get();
 
       final filteredIbu = ibuRawSnap.docs.where((doc) {
+        // ignore: unnecessary_cast
         final data = doc.data() as Map<String, dynamic>;
         final bulan = int.tryParse(data['bulan']?.toString() ?? '');
         final tahun = int.tryParse(data['tahun']?.toString() ?? '');
@@ -155,6 +157,7 @@ class _HomePageState extends State<HomePage> {
       });
 
       for (var doc in filteredIbu) {
+        // ignore: unnecessary_cast
         final data = doc.data() as Map<String, dynamic>;
         final bulan = int.parse(data['bulan'].toString());
         ibuData[bulan - 1]['count'] = (ibuData[bulan - 1]['count'] as int) + 1;
