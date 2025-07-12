@@ -12,84 +12,80 @@ class VaksinImunisasiPage extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: const Color(0xFFD81B60),
         title: const Text("Vaksin dan Imunisasi"),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: GridView(
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            crossAxisSpacing: 20,
-            mainAxisSpacing: 20,
-            childAspectRatio: 1.3,
-          ),
-          children: [
-            _buildCard(
-              title: "Riwayat Vaksin",
-              icon: Icons.history,
-              color: Colors.purpleAccent,
-              context: context,
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (context) => const RiwayatVaksinPage()),
-                );
-              },
-            ),
-            _buildCard(
-              title: "Jadwal Vaksin",
-              icon: Icons.event,
-              color: Colors.teal,
-              context: context,
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (context) => const JadwalVaksinPage()),
-                );
-              },
-            ),
-          ],
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
         ),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          _buildMenuItem(
+            icon: Icons.history,
+            title: "Riwayat Vaksin",
+            subtitle: "Data riwayat imunisasi anak.",
+            iconColor: Colors.purple,
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (context) => const RiwayatVaksinPage()),
+            ),
+          ),
+          const SizedBox(height: 12),
+          _buildMenuItem(
+            icon: Icons.event,
+            title: "Jadwal Vaksin",
+            subtitle: "Informasi jadwal vaksinasi anak.",
+            iconColor: Colors.teal,
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const JadwalVaksinPage()),
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildCard({
-    required String title,
+  Widget _buildMenuItem({
     required IconData icon,
-    required Color color,
-    required BuildContext context,
+    required String title,
+    required String subtitle,
+    required Color iconColor,
     required VoidCallback onTap,
   }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(15),
-      child: Card(
-        color: Colors.white,
-        elevation: 5,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(15),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircleAvatar(
-              radius: 30,
-              backgroundColor: color.withOpacity(0.2),
-              child: Icon(icon, size: 35, color: color),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Colors.deepPurple,
+    return Card(
+      elevation: 3,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              CircleAvatar(
+                backgroundColor: iconColor.withOpacity(0.2),
+                child: Icon(icon, color: iconColor),
               ),
-            ),
-          ],
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title,
+                        style: const TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 4),
+                    Text(subtitle,
+                        style:
+                            const TextStyle(fontSize: 13, color: Colors.grey)),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right, color: Colors.grey),
+            ],
+          ),
         ),
       ),
     );

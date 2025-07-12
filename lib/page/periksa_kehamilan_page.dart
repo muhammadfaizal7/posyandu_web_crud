@@ -33,16 +33,19 @@ class PeriksaKehamilanPage extends StatelessWidget {
     final List<Map<String, dynamic>> categories = [
       {
         "title": "Data Kehamilan",
+        "description": "Data umum ibu hamil yang terdaftar.",
         "icon": Icons.pregnant_woman,
         "page": const DataKehamilanPage()
       },
       {
         "title": "Pemeriksaan Fisik",
+        "description": "Catatan hasil pemeriksaan fisik ibu hamil.",
         "icon": Icons.monitor_heart,
         "page": const PemeriksaanFisikPage()
       },
       {
         "title": "Imunisasi dan Pemberian Obat",
+        "description": "Riwayat imunisasi dan obat yang diberikan.",
         "icon": Icons.vaccines,
         "page": const ImunisasiObatPage()
       },
@@ -55,18 +58,43 @@ class PeriksaKehamilanPage extends StatelessWidget {
         elevation: 0,
       ),
       backgroundColor: const Color(0xFFFFF0F5),
-      body: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: GridView.builder(
-          itemCount: categories.length,
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            crossAxisSpacing: 20,
-            mainAxisSpacing: 20,
-            childAspectRatio: 1.1,
-          ),
-          itemBuilder: (context, index) {
-            return InkWell(
+      body: ListView.builder(
+        padding: const EdgeInsets.all(16.0),
+        itemCount: categories.length,
+        itemBuilder: (context, index) {
+          return Card(
+            margin: const EdgeInsets.only(bottom: 16.0),
+            elevation: 3,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: ListTile(
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              leading: CircleAvatar(
+                radius: 25,
+                backgroundColor: Colors.pink.shade100,
+                child: Icon(
+                  categories[index]["icon"],
+                  color: Colors.pink,
+                  size: 28,
+                ),
+              ),
+              title: Text(
+                categories[index]["title"],
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 16,
+                ),
+              ),
+              subtitle: Text(
+                categories[index]["description"],
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: Colors.black54,
+                ),
+              ),
+              trailing: const Icon(Icons.chevron_right),
               onTap: () {
                 Navigator.push(
                   context,
@@ -74,45 +102,9 @@ class PeriksaKehamilanPage extends StatelessWidget {
                       builder: (context) => categories[index]["page"]),
                 );
               },
-              borderRadius: BorderRadius.circular(15),
-              child: Card(
-                elevation: 4,
-                color: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                      vertical: 20.0, horizontal: 10.0),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      CircleAvatar(
-                        radius: 28,
-                        backgroundColor: Colors.pink.shade100,
-                        child: Icon(
-                          categories[index]["icon"],
-                          color: Colors.pink,
-                          size: 30,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        categories[index]["title"],
-                        textAlign: TextAlign.center,
-                        style: GoogleFonts.poppins(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.black87,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          },
-        ),
+            ),
+          );
+        },
       ),
     );
   }

@@ -48,7 +48,7 @@ class WelcomePage extends StatelessWidget {
                     ),
                     const SizedBox(height: 6),
                     const Text(
-                      "E-PosyanduKu",
+                      "Posyandu Anggrek Merah",
                       style: TextStyle(
                         fontSize: 34,
                         fontWeight: FontWeight.bold,
