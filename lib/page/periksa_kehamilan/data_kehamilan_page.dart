@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 class DataKehamilanPage extends StatefulWidget {
   const DataKehamilanPage({super.key});
@@ -52,6 +53,12 @@ class _DataKehamilanPageState extends State<DataKehamilanPage> {
   void initState() {
     super.initState();
     fetchIbuHamilData();
+  }
+
+  // Fungsi untuk mendapatkan tanggal saat ini dalam format YYYY-MM-DD
+  String getCurrentDate() {
+    final now = DateTime.now();
+    return DateFormat('yyyy-MM-dd').format(now);
   }
 
   Future<void> fetchIbuHamilData() async {
@@ -211,7 +218,8 @@ class _DataKehamilanPageState extends State<DataKehamilanPage> {
     } else {
       selectedNIK = null;
       selectedNama = null;
-      tanggalPeriksaController.clear();
+      // Otomatis isi dengan tanggal saat ini untuk data baru
+      tanggalPeriksaController.text = getCurrentDate();
       usiaKehamilanController.clear();
       taksiranPersalinanController.clear();
       keluhanController.clear();
@@ -282,15 +290,45 @@ class _DataKehamilanPageState extends State<DataKehamilanPage> {
               ),
               const SizedBox(height: 16),
               _buildInputField(
-                child: TextField(
-                  controller: tanggalPeriksaController,
-                  decoration: const InputDecoration(
-                    labelText: "Tanggal Periksa (YYYY-MM-DD)",
-                    labelStyle: TextStyle(color: textSecondary),
-                    border: InputBorder.none,
-                    contentPadding:
-                        EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: tanggalPeriksaController,
+                        readOnly: true, // Buat field read-only
+                        decoration: const InputDecoration(
+                          labelText: "Tanggal Periksa",
+                          labelStyle: TextStyle(color: textSecondary),
+                          border: InputBorder.none,
+                          contentPadding: EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 12),
+                          suffixIcon:
+                              Icon(Icons.calendar_today, color: primaryColor),
+                        ),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w500,
+                          color: textPrimary,
+                        ),
+                      ),
+                    ),
+                    Container(
+                      margin: const EdgeInsets.only(right: 8),
+                      decoration: BoxDecoration(
+                        color: primaryColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: IconButton(
+                        icon: const Icon(Icons.refresh,
+                            color: primaryColor, size: 20),
+                        tooltip: "Perbarui ke tanggal hari ini",
+                        onPressed: () {
+                          setState(() {
+                            tanggalPeriksaController.text = getCurrentDate();
+                          });
+                        },
+                      ),
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: 16),

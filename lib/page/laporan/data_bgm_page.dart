@@ -91,6 +91,116 @@ class _DataBgmPageState extends State<DataBgmPage> {
     }
   }
 
+  // Fungsi baru untuk mengambil data pemeriksaan balita terakhir
+  Future<Map<String, dynamic>?> _getLatestPemeriksaanBalita(
+      String namaBalita) async {
+    try {
+      print('Mencari data pemeriksaan untuk: $namaBalita'); // Debug log
+
+      // Coba beberapa kemungkinan field name untuk nama balita
+      List<String> possibleFields = ['nama_balita', 'nama_anak', 'nama'];
+      QuerySnapshot? snapshot;
+
+      for (String fieldName in possibleFields) {
+        try {
+          snapshot = await FirebaseFirestore.instance
+              .collection('pemeriksaan_balita')
+              .where(fieldName, isEqualTo: namaBalita)
+              .get();
+
+          if (snapshot.docs.isNotEmpty) {
+            print('Data ditemukan dengan field: $fieldName');
+            break;
+          }
+        } catch (e) {
+          print('Field $fieldName tidak ada atau error: $e');
+          continue;
+        }
+      }
+
+      if (snapshot == null || snapshot.docs.isEmpty) {
+        print(
+            'Tidak ada data pemeriksaan ditemukan untuk semua field yang dicoba');
+        return null;
+      }
+
+      print('Jumlah data ditemukan: ${snapshot.docs.length}'); // Debug log
+
+      // Sort manual untuk mendapatkan data terbaru
+      final docs = snapshot.docs.toList();
+      docs.sort((a, b) {
+        final dataA = a.data() as Map<String, dynamic>;
+        final dataB = b.data() as Map<String, dynamic>;
+
+        // Sort berdasarkan tahun dulu
+        final tahunA = dataA['tahun'] ?? 0;
+        final tahunB = dataB['tahun'] ?? 0;
+
+        if (tahunA != tahunB) {
+          return tahunB.compareTo(tahunA); // Descending
+        }
+
+        // Jika tahun sama, sort berdasarkan bulan
+        final bulanA = dataA['bulan'] ?? 0;
+        final bulanB = dataB['bulan'] ?? 0;
+
+        if (bulanA != bulanB) {
+          return bulanB.compareTo(bulanA); // Descending
+        }
+
+        // Jika ada created_at, gunakan itu
+        if (dataA['created_at'] != null && dataB['created_at'] != null) {
+          final timestampA = dataA['created_at'] as Timestamp;
+          final timestampB = dataB['created_at'] as Timestamp;
+          return timestampB.compareTo(timestampA); // Descending
+        }
+
+        return 0;
+      });
+
+      final latestData = docs.first.data() as Map<String, dynamic>;
+
+      // Debug: print semua field yang ada
+      print('Fields dalam document: ${latestData.keys.toList()}');
+      print(
+          'Data terbaru - BB: ${latestData['berat_badan']}, TB: ${latestData['tinggi_badan']}');
+
+      // Coba beberapa kemungkinan field name untuk berat dan tinggi badan
+      double? beratBadan;
+      double? tinggiBadan;
+
+      // Kemungkinan field name untuk berat badan
+      for (String field in ['berat_badan', 'bb', 'berat', 'weight']) {
+        if (latestData[field] != null) {
+          beratBadan = latestData[field] is int
+              ? (latestData[field] as int).toDouble()
+              : latestData[field] as double?;
+          break;
+        }
+      }
+
+      // Kemungkinan field name untuk tinggi badan
+      for (String field in ['tinggi_badan', 'tb', 'tinggi', 'height']) {
+        if (latestData[field] != null) {
+          tinggiBadan = latestData[field] is int
+              ? (latestData[field] as int).toDouble()
+              : latestData[field] as double?;
+          break;
+        }
+      }
+
+      return {
+        'berat_badan': beratBadan,
+        'tinggi_badan': tinggiBadan,
+        'bulan_pemeriksaan': latestData['bulan'],
+        'tahun_pemeriksaan': latestData['tahun'],
+      };
+    } catch (e) {
+      print('Error mengambil data pemeriksaan: $e');
+      return null;
+    }
+  }
+
   Future<void> _showFilterDialog() async {
     int tempMonth = _selectedMonth;
     int tempYear = _selectedYear;
@@ -194,314 +304,394 @@ class _DataBgmPageState extends State<DataBgmPage> {
 
     await showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) {
-          final TextEditingController tanggalLahirController =
-              TextEditingController(text: tempTanggalLahir);
-          final TextEditingController usiaController =
-              TextEditingController(text: tempUsia);
-          final TextEditingController bbController = TextEditingController(
-              text: beratBadan != null ? beratBadan.toString() : "");
-          final TextEditingController tbController = TextEditingController(
-              text: tinggiBadan != null
-                  ? tinggiBadan.toString()
-                  : ""); // Corrected typo here
+      builder: (context) {
+        final TextEditingController tanggalLahirController =
+            TextEditingController(text: tempTanggalLahir);
+        final TextEditingController usiaController =
+            TextEditingController(text: tempUsia);
+        final TextEditingController bbController = TextEditingController(
+            text: beratBadan != null ? beratBadan.toString() : "");
+        final TextEditingController tbController = TextEditingController(
+            text: tinggiBadan != null ? tinggiBadan.toString() : "");
 
-          // Set selection to end of text
-          tanggalLahirController.selection = TextSelection.fromPosition(
-              TextPosition(offset: tanggalLahirController.text.length));
-          usiaController.selection = TextSelection.fromPosition(
-              TextPosition(offset: usiaController.text.length));
-          bbController.selection = TextSelection.fromPosition(
-              TextPosition(offset: bbController.text.length));
-          tbController.selection = TextSelection.fromPosition(
-              TextPosition(offset: tbController.text.length));
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            // Set selection to end of text - dipindahkan ke dalam StatefulBuilder
+            tanggalLahirController.selection = TextSelection.fromPosition(
+                TextPosition(offset: tanggalLahirController.text.length));
+            usiaController.selection = TextSelection.fromPosition(
+                TextPosition(offset: usiaController.text.length));
+            bbController.selection = TextSelection.fromPosition(
+                TextPosition(offset: bbController.text.length));
+            tbController.selection = TextSelection.fromPosition(
+                TextPosition(offset: tbController.text.length));
 
-          return AlertDialog(
-            backgroundColor: const Color(0xFFFFF0F5),
-            title: Text(
-              docId == null ? "Tambah Data BGM" : "Edit Data BGM",
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  DropdownButtonFormField<String>(
-                    value: selectedNamaAnak,
-                    decoration: InputDecoration(
-                      labelText: "Nama Anak",
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      prefixIcon: const Icon(Icons.child_care),
-                      filled: true,
-                      fillColor: Colors.white,
-                    ),
-                    items: _balitaList
-                        .map((balita) => DropdownMenuItem(
-                              value: balita['nama'] as String,
-                              child: Text(balita['nama'] as String),
-                              onTap: () {
-                                final tglLahirRaw = balita['tanggal_lahir'];
-                                DateTime tglLahir;
-                                if (tglLahirRaw is Timestamp) {
-                                  tglLahir = tglLahirRaw.toDate();
-                                } else if (tglLahirRaw is String) {
-                                  try {
-                                    tglLahir = DateFormat('yyyy-MM-dd')
-                                        .parse(tglLahirRaw);
-                                  } catch (e) {
-                                    // Fallback to a default or error handling
-                                    tglLahir = DateTime.now();
-                                    if (mounted) {
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(
-                                        SnackBar(
-                                            content: Text(
-                                                "Gagal memparsing tanggal lahir: $e"),
-                                            backgroundColor: Colors.orange),
-                                      );
-                                    }
-                                  }
-                                } else {
-                                  tglLahir = DateTime.now(); // Fallback
-                                }
-
-                                final now = DateTime.now();
-                                int years = now.year - tglLahir.year;
-                                int months = now.month - tglLahir.month;
-                                int days = now.day - tglLahir.day;
-
-                                if (days < 0) {
-                                  months--;
-                                  days += DateTime(now.year, now.month, 0).day;
-                                }
-                                if (months < 0) {
-                                  years--;
-                                  months += 12;
-                                }
-
-                                String ageText = '';
-                                if (years > 0) {
-                                  ageText += '$years tahun ';
-                                }
-                                if (months > 0) {
-                                  ageText += '$months bulan';
-                                } else if (years == 0 && months == 0) {
-                                  ageText = '$days hari';
-                                }
-
-                                setDialogState(() {
-                                  tempTanggalLahir =
-                                      DateFormat('dd-MM-yyyy').format(tglLahir);
-                                  tempUsia = ageText.trim();
-                                  tanggalLahirController.text =
-                                      tempTanggalLahir; // Update controller text
-                                  usiaController.text =
-                                      tempUsia; // Update controller text
-                                });
-                              },
-                            ))
-                        .toList(),
-                    onChanged: (val) => setDialogState(() {
-                      selectedNamaAnak = val;
-                    }),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: tanggalLahirController,
-                    readOnly: true,
-                    decoration: InputDecoration(
-                      labelText: "Tanggal Lahir",
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      prefixIcon: const Icon(Icons.cake),
-                      filled: true,
-                      fillColor: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: usiaController,
-                    readOnly: true,
-                    decoration: InputDecoration(
-                      labelText: "Usia",
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      prefixIcon: const Icon(Icons.baby_changing_station),
-                      filled: true,
-                      fillColor: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: bbController,
-                    keyboardType: TextInputType.number,
-                    decoration: InputDecoration(
-                      labelText: "Berat Badan (kg)",
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      prefixIcon: const Icon(Icons.monitor_weight),
-                      filled: true,
-                      fillColor: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: tbController,
-                    keyboardType: TextInputType.number,
-                    decoration: InputDecoration(
-                      labelText: "Tinggi Badan (cm)",
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      prefixIcon: const Icon(Icons.height),
-                      filled: true,
-                      fillColor: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  DropdownButtonFormField<String>(
-                    value: selectedKeterangan,
-                    decoration: InputDecoration(
-                      labelText: "Keterangan",
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      prefixIcon: const Icon(Icons.info_outline),
-                      filled: true,
-                      fillColor: Colors.white,
-                    ),
-                    items: _keteranganOptions
-                        .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-                        .toList(),
-                    onChanged: (val) =>
-                        setDialogState(() => selectedKeterangan = val),
-                  ),
-                  const SizedBox(height: 16),
-                  DropdownButtonFormField<int>(
-                    value: selectedBulan,
-                    decoration: InputDecoration(
-                      labelText: "Bulan",
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      prefixIcon: const Icon(Icons.calendar_month),
-                    ),
-                    items: List.generate(
-                        12,
-                        (index) => DropdownMenuItem(
-                            value: index + 1, child: Text(_namaBulan[index]))),
-                    onChanged: (val) =>
-                        setDialogState(() => selectedBulan = val),
-                  ),
-                  const SizedBox(height: 16),
-                  DropdownButtonFormField<int>(
-                    value: selectedTahun,
-                    decoration: InputDecoration(
-                      labelText: "Tahun",
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      prefixIcon: const Icon(Icons.calendar_today),
-                      filled: true,
-                      fillColor: Colors.white,
-                    ),
-                    items: _tahunOptions
-                        .map((year) =>
-                            DropdownMenuItem(value: year, child: Text("$year")))
-                        .toList(),
-                    onChanged: (val) =>
-                        setDialogState(() => selectedTahun = val),
-                  ),
-                ],
+            return AlertDialog(
+              backgroundColor: const Color(0xFFFFF0F5),
+              title: Text(
+                docId == null ? "Tambah Data BGM" : "Edit Data BGM",
+                style: const TextStyle(fontWeight: FontWeight.bold),
               ),
-            ),
-            actions: [
-              TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text("Batal")),
-              ElevatedButton(
-                onPressed: () async {
-                  if (selectedNamaAnak == null ||
-                      tanggalLahirController.text.isEmpty ||
-                      usiaController.text.isEmpty ||
-                      bbController.text.isEmpty ||
-                      tbController.text.isEmpty ||
-                      selectedKeterangan == null ||
-                      selectedBulan == null ||
-                      selectedTahun == null) {
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                          content: Text("Mohon lengkapi semua data!"),
-                          backgroundColor: Colors.red));
-                    }
-                    return;
-                  }
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    DropdownButtonFormField<String>(
+                      value: selectedNamaAnak,
+                      decoration: InputDecoration(
+                        labelText: "Nama Anak",
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        prefixIcon: const Icon(Icons.child_care),
+                        filled: true,
+                        fillColor: Colors.white,
+                      ),
+                      items: _balitaList
+                          .map((balita) => DropdownMenuItem(
+                                value: balita['nama'] as String,
+                                child: Text(balita['nama'] as String),
+                              ))
+                          .toList(),
+                      onChanged: (val) async {
+                        if (val != null) {
+                          setDialogState(() {
+                            selectedNamaAnak = val;
+                          });
 
-                  final data = {
-                    "nama_anak": selectedNamaAnak,
-                    "tanggal_lahir": tanggalLahirController.text,
-                    "usia": usiaController.text,
-                    "berat_badan": double.tryParse(bbController.text),
-                    "tinggi_badan": double.tryParse(tbController.text),
-                    "keterangan": selectedKeterangan,
-                    "bulan": selectedBulan,
-                    "tahun": selectedTahun,
-                    "created_at": FieldValue.serverTimestamp(),
-                  };
+                          // Cari data balita yang dipilih
+                          final selectedBalita = _balitaList.firstWhere(
+                            (balita) => balita['nama'] == val,
+                            orElse: () => {},
+                          );
 
-                  try {
-                    if (docId == null) {
-                      await _collection.add(data);
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                                content: Text("Data berhasil ditambahkan."),
-                                backgroundColor: Colors.green));
-                      }
-                    } else {
-                      await _collection.doc(docId).update(data);
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                                content: Text("Data berhasil diperbarui."),
-                                backgroundColor: Colors.green));
-                      }
-                    }
-                    if (mounted) Navigator.pop(context);
-                  } on FirebaseException catch (e) {
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                            content: Text("Gagal menyimpan data: ${e.message}"),
-                            backgroundColor: Colors.red),
-                      );
-                    }
-                  } catch (e) {
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                            content: Text("Terjadi kesalahan: $e"),
-                            backgroundColor: Colors.red),
-                      );
-                    }
-                  }
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.pink,
-                  foregroundColor: Colors.white,
+                          if (selectedBalita.isNotEmpty) {
+                            final tglLahirRaw = selectedBalita['tanggal_lahir'];
+                            DateTime tglLahir;
+
+                            if (tglLahirRaw is Timestamp) {
+                              tglLahir = tglLahirRaw.toDate();
+                            } else if (tglLahirRaw is String) {
+                              try {
+                                tglLahir =
+                                    DateFormat('yyyy-MM-dd').parse(tglLahirRaw);
+                              } catch (e) {
+                                tglLahir = DateTime.now();
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                          "Gagal memparsing tanggal lahir: $e"),
+                                      backgroundColor: Colors.orange,
+                                    ),
+                                  );
+                                }
+                              }
+                            } else {
+                              tglLahir = DateTime.now();
+                            }
+
+                            final now = DateTime.now();
+                            int years = now.year - tglLahir.year;
+                            int months = now.month - tglLahir.month;
+                            int days = now.day - tglLahir.day;
+
+                            if (days < 0) {
+                              months--;
+                              days += DateTime(now.year, now.month, 0).day;
+                            }
+                            if (months < 0) {
+                              years--;
+                              months += 12;
+                            }
+
+                            String ageText = '';
+                            if (years > 0) {
+                              ageText += '$years tahun ';
+                            }
+                            if (months > 0) {
+                              ageText += '$months bulan';
+                            } else if (years == 0 && months == 0) {
+                              ageText = '$days hari';
+                            }
+
+                            // Update tanggal lahir dan usia
+                            tempTanggalLahir =
+                                DateFormat('dd-MM-yyyy').format(tglLahir);
+                            tempUsia = ageText.trim();
+                            tanggalLahirController.text = tempTanggalLahir;
+                            usiaController.text = tempUsia;
+
+                            // Ambil data pemeriksaan balita terakhir
+                            print('Mengambil data pemeriksaan untuk: $val');
+                            final latestPemeriksaan =
+                                await _getLatestPemeriksaanBalita(val);
+
+                            if (latestPemeriksaan != null) {
+                              // Update controller
+                              if (latestPemeriksaan['berat_badan'] != null) {
+                                bbController.text =
+                                    latestPemeriksaan['berat_badan'].toString();
+                                print(
+                                    'BB Controller diisi: ${bbController.text}'); // Debug
+                              }
+                              if (latestPemeriksaan['tinggi_badan'] != null) {
+                                tbController.text =
+                                    latestPemeriksaan['tinggi_badan']
+                                        .toString();
+                                print(
+                                    'TB Controller diisi: ${tbController.text}'); // Debug
+                              }
+
+                              // Trigger rebuild
+                              setDialogState(() {});
+
+                              // Tampilkan info pemeriksaan terakhir
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                        "Data BB & TB diisi otomatis dari pemeriksaan ${_namaBulan[(latestPemeriksaan['bulan_pemeriksaan'] ?? 1) - 1]} ${latestPemeriksaan['tahun_pemeriksaan']}"),
+                                    backgroundColor: Colors.green,
+                                    duration: const Duration(seconds: 3),
+                                  ),
+                                );
+                              }
+                            } else {
+                              // Jika tidak ada data pemeriksaan, kosongkan field
+                              bbController.clear();
+                              tbController.clear();
+                              setDialogState(() {});
+
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                        "Tidak ada data pemeriksaan untuk balita ini"),
+                                    backgroundColor: Colors.orange,
+                                    duration: Duration(seconds: 2),
+                                  ),
+                                );
+                              }
+                            }
+                          }
+                        }
+                      },
+                    ),
+                    // ... sisa field TextField dan DropdownButtonFormField lainnya tetap sama
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: tanggalLahirController,
+                      readOnly: true,
+                      decoration: InputDecoration(
+                        labelText: "Tanggal Lahir",
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        prefixIcon: const Icon(Icons.cake),
+                        filled: true,
+                        fillColor: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: usiaController,
+                      readOnly: true,
+                      decoration: InputDecoration(
+                        labelText: "Usia",
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        prefixIcon: const Icon(Icons.baby_changing_station),
+                        filled: true,
+                        fillColor: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: bbController,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        labelText: "Berat Badan (kg)",
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        prefixIcon: const Icon(Icons.monitor_weight),
+                        filled: true,
+                        fillColor: Colors.white,
+                        helperText:
+                            "Akan terisi otomatis dari data pemeriksaan terakhir",
+                        helperStyle: TextStyle(
+                          color: Colors.grey.shade600,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: tbController,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        labelText: "Tinggi Badan (cm)",
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        prefixIcon: const Icon(Icons.height),
+                        filled: true,
+                        fillColor: Colors.white,
+                        helperText:
+                            "Akan terisi otomatis dari data pemeriksaan terakhir",
+                        helperStyle: TextStyle(
+                          color: Colors.grey.shade600,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                    // ... sisa dropdown lainnya tetap sama
+                    const SizedBox(height: 16),
+                    DropdownButtonFormField<String>(
+                      value: selectedKeterangan,
+                      decoration: InputDecoration(
+                        labelText: "Keterangan",
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        prefixIcon: const Icon(Icons.info_outline),
+                        filled: true,
+                        fillColor: Colors.white,
+                      ),
+                      items: _keteranganOptions
+                          .map(
+                              (e) => DropdownMenuItem(value: e, child: Text(e)))
+                          .toList(),
+                      onChanged: (val) =>
+                          setDialogState(() => selectedKeterangan = val),
+                    ),
+                    const SizedBox(height: 16),
+                    DropdownButtonFormField<int>(
+                      value: selectedBulan,
+                      decoration: InputDecoration(
+                        labelText: "Bulan",
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        prefixIcon: const Icon(Icons.calendar_month),
+                      ),
+                      items: List.generate(
+                          12,
+                          (index) => DropdownMenuItem(
+                              value: index + 1,
+                              child: Text(_namaBulan[index]))),
+                      onChanged: (val) =>
+                          setDialogState(() => selectedBulan = val),
+                    ),
+                    const SizedBox(height: 16),
+                    DropdownButtonFormField<int>(
+                      value: selectedTahun,
+                      decoration: InputDecoration(
+                        labelText: "Tahun",
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        prefixIcon: const Icon(Icons.calendar_today),
+                        filled: true,
+                        fillColor: Colors.white,
+                      ),
+                      items: _tahunOptions
+                          .map((year) => DropdownMenuItem(
+                              value: year, child: Text("$year")))
+                          .toList(),
+                      onChanged: (val) =>
+                          setDialogState(() => selectedTahun = val),
+                    ),
+                  ],
                 ),
-                child: const Text("Simpan"),
-              )
-            ],
-          );
-        },
-      ),
+              ),
+              actions: [
+                TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text("Batal")),
+                ElevatedButton(
+                  onPressed: () async {
+                    // ... kode actions tetap sama seperti aslinya
+                    if (selectedNamaAnak == null ||
+                        tanggalLahirController.text.isEmpty ||
+                        usiaController.text.isEmpty ||
+                        bbController.text.isEmpty ||
+                        tbController.text.isEmpty ||
+                        selectedKeterangan == null ||
+                        selectedBulan == null ||
+                        selectedTahun == null) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                                content: Text("Mohon lengkapi semua data!"),
+                                backgroundColor: Colors.red));
+                      }
+                      return;
+                    }
+
+                    final data = {
+                      "nama_anak": selectedNamaAnak,
+                      "tanggal_lahir": tanggalLahirController.text,
+                      "usia": usiaController.text,
+                      "berat_badan": double.tryParse(bbController.text),
+                      "tinggi_badan": double.tryParse(tbController.text),
+                      "keterangan": selectedKeterangan,
+                      "bulan": selectedBulan,
+                      "tahun": selectedTahun,
+                      "created_at": FieldValue.serverTimestamp(),
+                    };
+
+                    try {
+                      if (docId == null) {
+                        await _collection.add(data);
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                  content: Text("Data berhasil ditambahkan."),
+                                  backgroundColor: Colors.green));
+                        }
+                      } else {
+                        await _collection.doc(docId).update(data);
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                  content: Text("Data berhasil diperbarui."),
+                                  backgroundColor: Colors.green));
+                        }
+                      }
+                      if (mounted) Navigator.pop(context);
+                    } on FirebaseException catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                              content:
+                                  Text("Gagal menyimpan data: ${e.message}"),
+                              backgroundColor: Colors.red),
+                        );
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                              content: Text("Terjadi kesalahan: $e"),
+                              backgroundColor: Colors.red),
+                        );
+                      }
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.pink,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text("Simpan"),
+                )
+              ],
+            );
+          },
+        );
+      },
     );
   }
 
