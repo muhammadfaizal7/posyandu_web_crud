@@ -161,7 +161,9 @@ class _JadwalVaksinPageState extends State<JadwalVaksinPage> {
   }
 
   void _tambahJadwalVaksin() {
-    TextEditingController posyanduController = TextEditingController();
+    // Inisialisasi controller dengan nilai default
+    TextEditingController posyanduController =
+        TextEditingController(text: "Posyandu Anggrek Merah");
     TextEditingController jenisVaksinController = TextEditingController();
     DateTime selectedDate = DateTime.now();
 
